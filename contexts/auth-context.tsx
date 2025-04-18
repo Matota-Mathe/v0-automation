@@ -19,13 +19,29 @@ type AuthContextType = {
   user: User | null
   isLoading: boolean
   login: (email: string, password: string) => Promise<boolean>
-  register: (name: string, email: string, password: string) => Promise<boolean>
+  register: (name: string, email: string, password: string, role?: Role) => Promise<boolean>
   logout: () => void
   updateUserRole: (userId: string, role: Role) => Promise<boolean>
   hasPermission: (permission: string) => boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+// Demo accounts for testing
+const demoAccounts = [
+  { email: "admin@example.com", password: "password123", role: "admin", name: "Admin User" },
+  { email: "researcher@example.com", password: "password123", role: "researcher", name: "Researcher" },
+  { email: "demo1@nmu.edu", password: "demo1pass", role: "researcher", name: "Alex Johnson" },
+  { email: "demo2@nmu.edu", password: "demo2pass", role: "researcher", name: "Taylor Smith" },
+  { email: "demo3@nmu.edu", password: "demo3pass", role: "technician", name: "Jordan Lee" },
+  { email: "demo4@nmu.edu", password: "demo4pass", role: "technician", name: "Casey Brown" },
+  { email: "demo5@nmu.edu", password: "demo5pass", role: "guest", name: "Morgan White" },
+  { email: "demo6@nmu.edu", password: "demo6pass", role: "researcher", name: "Riley Green" },
+  { email: "demo7@nmu.edu", password: "demo7pass", role: "researcher", name: "Quinn Davis" },
+  { email: "demo8@nmu.edu", password: "demo8pass", role: "technician", name: "Sam Wilson" },
+  { email: "demo9@nmu.edu", password: "demo9pass", role: "guest", name: "Jamie Miller" },
+  { email: "demo10@nmu.edu", password: "demo10pass", role: "researcher", name: "Drew Parker" },
+]
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -127,15 +143,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true)
 
     try {
-      // For demo purposes, allow login with these test credentials
-      if (email === "admin@example.com" && password === "password123") {
-        // Mock successful login with admin user
+      // Check if this is one of our demo accounts
+      const demoAccount = demoAccounts.find((account) => account.email === email && account.password === password)
+
+      if (demoAccount) {
+        // Mock successful login with demo account
         const mockUser = {
-          id: "1",
-          name: "Admin User",
-          email: "admin@example.com",
-          role: "admin" as Role,
-          avatar: "/admin-avatar.jpg",
+          id: `demo-${Date.now()}`,
+          name: demoAccount.name,
+          email: demoAccount.email,
+          role: demoAccount.role as Role,
+          avatar: null,
         }
 
         setUser(mockUser)
@@ -146,25 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return true
       }
 
-      if (email === "researcher@example.com" && password === "password123") {
-        // Mock successful login with researcher user
-        const mockUser = {
-          id: "2",
-          name: "Researcher",
-          email: "researcher@example.com",
-          role: "researcher" as Role,
-          avatar: "/researcher-avatar.jpg",
-        }
-
-        setUser(mockUser)
-
-        // Store in localStorage for persistence
-        localStorage.setItem("flowChemUser", JSON.stringify(mockUser))
-
-        return true
-      }
-
-      // Try actual Supabase authentication if not using test credentials
+      // Try actual Supabase authentication if not using demo credentials
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -214,43 +214,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   // Register function
-  const register = async (name: string, email: string, password: string) => {
+  const register = async (name: string, email: string, password: string, role: Role = "guest") => {
     setIsLoading(true)
 
     try {
-      // Create auth user
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      })
-
-      if (error || !data.user) {
-        console.error("Registration error:", error)
-        return false
-      }
-
-      // Create user profile
-      const { error: profileError } = await supabase.from("user_profiles").insert([
-        {
-          id: data.user.id,
-          name,
-          role: "guest", // Default role
-          avatar_url: null,
-        },
-      ])
-
-      if (profileError) {
-        console.error("Error creating user profile:", profileError)
-        return false
-      }
-
-      setUser({
-        id: data.user.id,
+      // For demo purposes, store in localStorage
+      const mockUser = {
+        id: `user-${Date.now()}`,
         name,
         email,
-        role: "guest",
+        role,
         avatar: null,
+      }
+
+      // Store in localStorage
+      const registeredUsers = JSON.parse(localStorage.getItem("registeredUsers") || "[]")
+      registeredUsers.push({
+        email,
+        password,
+        name,
+        role,
       })
+      localStorage.setItem("registeredUsers", JSON.stringify(registeredUsers))
+
+      // In a real app, we would create the user in Supabase
+      // const { data, error } = await supabase.auth.signUp({
+      //   email,
+      //   password,
+      // })
+      //
+      // if (error || !data.user) {
+      //   console.error("Registration error:", error)
+      //   return false
+      // }
+      //
+      // // Create user profile
+      // const { error: profileError } = await supabase.from("user_profiles").insert([
+      //   {
+      //     id: data.user.id,
+      //     name,
+      //     role,
+      //     avatar_url: null,
+      //   },
+      // ])
+      //
+      // if (profileError) {
+      //   console.error("Error creating user profile:", profileError)
+      //   return false
+      // }
 
       return true
     } catch (error) {

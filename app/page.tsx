@@ -5,11 +5,12 @@ import type React from "react"
 import Link from "next/link"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Beaker, Github, Mail, Key } from "lucide-react"
+import { Beaker, Github, Mail, Key, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/contexts/auth-context"
 import { Loader2 } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function HomePage() {
   const [email, setEmail] = useState("")
@@ -60,7 +61,7 @@ export default function HomePage() {
       <header className="flex items-center justify-between p-4 border-b">
         <div className="flex items-center gap-2">
           <Beaker className="h-6 w-6 text-primary" />
-          <span className="text-xl font-bold">Flow Chemistry Lab</span>
+          <span className="text-xl font-bold">NMU Flow Chemistry Group</span>
         </div>
         <div className="flex items-center gap-4">
           <Link href="/register">
@@ -82,6 +83,16 @@ export default function HomePage() {
 
           <h1 className="text-2xl font-bold text-center mb-1">NMU Flow Chemistry Group</h1>
           <p className="text-center text-muted-foreground mb-6">Sign in to access your lab dashboard</p>
+
+          <Alert className="mb-4">
+            <Info className="h-4 w-4 mr-2" />
+            <AlertDescription>
+              <Link href="/demo-accounts" className="text-primary hover:underline">
+                View all demo accounts
+              </Link>{" "}
+              to test the system with different roles.
+            </AlertDescription>
+          </Alert>
 
           <form onSubmit={handleEmailLogin} className="space-y-4">
             <div>

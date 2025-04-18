@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Beaker, Loader2 } from "lucide-react"
@@ -21,6 +21,13 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { login } = useAuth()
   const router = useRouter()
+  const [registeredUsers, setRegisteredUsers] = useState([])
+
+  useEffect(() => {
+    // Load registered users from localStorage
+    const users = JSON.parse(localStorage.getItem("registeredUsers") || "[]")
+    setRegisteredUsers(users)
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,11 +37,9 @@ export default function LoginPage() {
     try {
       const success = await login(email, password)
       if (success) {
-        router.push("/")
+        router.push("/dashboard")
       } else {
-        setError(
-          "Invalid email or password. Try admin@example.com / password123 or researcher@example.com / password123",
-        )
+        setError("Invalid email or password. Please try again.")
       }
     } catch (err) {
       setError("An error occurred during login. Please try again.")
@@ -49,7 +54,7 @@ export default function LoginPage() {
       <div className="flex items-center justify-between p-4 border-b bg-background">
         <div className="flex items-center gap-2">
           <Beaker className="h-6 w-6 text-primary" />
-          <span className="text-lg font-semibold">Flow Chemistry Lab</span>
+          <span className="text-lg font-semibold">NMU Flow Chemistry Group</span>
         </div>
         <ThemeToggle />
       </div>
@@ -62,7 +67,7 @@ export default function LoginPage() {
                 <Beaker className="h-8 w-8 text-primary" />
               </div>
             </div>
-            <CardTitle className="text-2xl text-center">Welcome Back</CardTitle>
+            <CardTitle className="text-2xl text-center">NMU Flow Chemistry Group</CardTitle>
             <CardDescription className="text-center">
               Enter your credentials to access the Flow Chemistry Lab
             </CardDescription>
@@ -102,6 +107,22 @@ export default function LoginPage() {
                   className="bg-background"
                 />
               </div>
+
+              {registeredUsers.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Recently Registered Users</Label>
+                  <div className="text-sm text-muted-foreground">
+                    {registeredUsers.slice(0, 3).map((user, index) => (
+                      <div key={index} className="p-2 border rounded-md mb-1">
+                        <div>
+                          <strong>{user.name}</strong> ({user.email})
+                        </div>
+                        <div className="text-xs">Role: {user.role}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
             <CardFooter className="flex flex-col space-y-4">
               <Button type="submit" className="w-full" disabled={isSubmitting}>
@@ -125,7 +146,7 @@ export default function LoginPage() {
       </div>
 
       <div className="p-4 text-center text-sm text-muted-foreground border-t bg-background">
-        <p>© {new Date().getFullYear()} Flow Chemistry Lab. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} NMU Flow Chemistry Group. All rights reserved.</p>
       </div>
     </div>
   )
