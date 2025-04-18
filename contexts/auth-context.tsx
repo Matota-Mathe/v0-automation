@@ -5,6 +5,7 @@ import type { Role } from "@/utils/permissions"
 
 import { createContext, useContext, useEffect, useState } from "react"
 import { hasPermission } from "@/utils/permissions"
+import { getSupabaseBrowserClient } from "@/lib/supabase"
 
 type User = {
   id: string
@@ -29,123 +30,208 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const supabase = getSupabaseBrowserClient()
 
   // Check for existing session on mount
   useEffect(() => {
-    const storedUser = localStorage.getItem("user")
-    if (storedUser) {
+    const checkSession = async () => {
       try {
-        setUser(JSON.parse(storedUser))
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession()
+
+        if (error) {
+          console.error("Error getting session:", error)
+          setIsLoading(false)
+          return
+        }
+
+        if (session) {
+          // Get user profile from the database
+          const { data: profile, error: profileError } = await supabase
+            .from("user_profiles")
+            .select("*")
+            .eq("id", session.user.id)
+            .single()
+
+          if (profileError) {
+            console.error("Error fetching user profile:", profileError)
+            setIsLoading(false)
+            return
+          }
+
+          if (profile) {
+            setUser({
+              id: session.user.id,
+              name: profile.name,
+              email: session.user.email || "",
+              role: profile.role as Role,
+              avatar: profile.avatar_url,
+            })
+          }
+        }
       } catch (error) {
-        console.error("Failed to parse stored user:", error)
-        localStorage.removeItem("user")
+        console.error("Session check error:", error)
+      } finally {
+        setIsLoading(false)
       }
     }
-    setIsLoading(false)
-  }, [])
 
-  // Mock login function - in a real app, this would call an API
+    checkSession()
+
+    // Set up auth state change listener
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_IN" && session) {
+        // Get user profile from the database
+        const { data: profile } = await supabase.from("user_profiles").select("*").eq("id", session.user.id).single()
+
+        if (profile) {
+          setUser({
+            id: session.user.id,
+            name: profile.name,
+            email: session.user.email || "",
+            role: profile.role as Role,
+            avatar: profile.avatar_url,
+          })
+        }
+      } else if (event === "SIGNED_OUT") {
+        setUser(null)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [supabase])
+
+  // Login function
   const login = async (email: string, password: string) => {
     setIsLoading(true)
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    // Demo users for testing
-    const demoUsers = [
-      {
-        id: "1",
-        name: "Admin User",
-        email: "admin@example.com",
-        password: "password123",
-        role: "admin" as Role,
-        avatar: "/admin-avatar.jpg",
-      },
-      {
-        id: "2",
-        name: "Researcher",
-        email: "researcher@example.com",
-        password: "password123",
-        role: "researcher" as Role,
-        avatar: "/researcher-avatar.jpg",
-      },
-      {
-        id: "3",
-        name: "Technician",
-        email: "technician@example.com",
-        password: "password123",
-        role: "technician" as Role,
-        avatar: "/technician-avatar.jpg",
-      },
-      {
-        id: "4",
-        name: "Guest User",
-        email: "guest@example.com",
-        password: "password123",
-        role: "guest" as Role,
-        avatar: "/guest-avatar.jpg",
-      },
-    ]
+      if (error) {
+        console.error("Login error:", error)
+        return false
+      }
 
-    const foundUser = demoUsers.find((u) => u.email === email && u.password === password)
+      // Get user profile
+      const { data: profile, error: profileError } = await supabase
+        .from("user_profiles")
+        .select("*")
+        .eq("id", data.user.id)
+        .single()
 
-    if (foundUser) {
-      // Remove password before storing
-      const { password, ...userWithoutPassword } = foundUser
-      setUser(userWithoutPassword)
-      localStorage.setItem("user", JSON.stringify(userWithoutPassword))
+      if (profileError) {
+        console.error("Error fetching user profile:", profileError)
+        return false
+      }
+
+      if (profile) {
+        setUser({
+          id: data.user.id,
+          name: profile.name,
+          email: data.user.email || "",
+          role: profile.role as Role,
+          avatar: profile.avatar_url,
+        })
+        return true
+      }
+
+      return false
+    } catch (error) {
+      console.error("Login error:", error)
+      return false
+    } finally {
       setIsLoading(false)
-      return true
     }
-
-    setIsLoading(false)
-    return false
   }
 
-  // Mock register function
+  // Register function
   const register = async (name: string, email: string, password: string) => {
     setIsLoading(true)
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    try {
+      // Create auth user
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      })
 
-    // Create new user with guest role by default
-    const newUser = {
-      id: Math.random().toString(36).substring(2, 9),
-      name,
-      email,
-      role: "guest" as Role,
+      if (error || !data.user) {
+        console.error("Registration error:", error)
+        return false
+      }
+
+      // Create user profile
+      const { error: profileError } = await supabase.from("user_profiles").insert([
+        {
+          id: data.user.id,
+          name,
+          role: "guest", // Default role
+          avatar_url: null,
+        },
+      ])
+
+      if (profileError) {
+        console.error("Error creating user profile:", profileError)
+        return false
+      }
+
+      setUser({
+        id: data.user.id,
+        name,
+        email,
+        role: "guest",
+        avatar: null,
+      })
+
+      return true
+    } catch (error) {
+      console.error("Registration error:", error)
+      return false
+    } finally {
+      setIsLoading(false)
     }
-
-    setUser(newUser)
-    localStorage.setItem("user", JSON.stringify(newUser))
-    setIsLoading(false)
-    return true
   }
 
-  const logout = () => {
+  // Logout function
+  const logout = async () => {
+    await supabase.auth.signOut()
     setUser(null)
-    localStorage.removeItem("user")
   }
 
   // Function to update a user's role (admin only)
   const updateUserRole = async (userId: string, role: Role) => {
-    // In a real app, this would call an API
     if (user?.role !== "admin") {
       return false
     }
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    try {
+      const { error } = await supabase.from("user_profiles").update({ role }).eq("id", userId)
 
-    // If updating the current user
-    if (userId === user.id) {
-      const updatedUser = { ...user, role }
-      setUser(updatedUser)
-      localStorage.setItem("user", JSON.stringify(updatedUser))
+      if (error) {
+        console.error("Error updating user role:", error)
+        return false
+      }
+
+      // If updating the current user
+      if (userId === user.id) {
+        setUser((prev) => (prev ? { ...prev, role } : null))
+      }
+
+      return true
+    } catch (error) {
+      console.error("Error updating user role:", error)
+      return false
     }
-
-    return true
   }
 
   // Check if current user has a specific permission

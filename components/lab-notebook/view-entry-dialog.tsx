@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { LabEntry } from "@/contexts/lab-notebook-context"
-import { FileText, ImageIcon, FileSpreadsheet } from "lucide-react"
+import { FileText, ImageIcon, FileSpreadsheet, ExternalLink } from "lucide-react"
 
 interface ViewEntryDialogProps {
   open: boolean
@@ -40,15 +40,22 @@ export function ViewEntryDialog({ open, onOpenChange, entry }: ViewEntryDialogPr
   }
 
   const getFileIcon = (fileName: string) => {
-    const extension = fileName.split(".").pop()?.toLowerCase()
-    if (["jpg", "jpeg", "png", "gif", "svg"].includes(extension || "")) {
+    const extension = fileName.split(".").pop()?.toLowerCase() || ""
+
+    if (["jpg", "jpeg", "png", "gif", "svg", "webp"].includes(extension)) {
       return <ImageIcon className="h-4 w-4" />
-    } else if (["pdf"].includes(extension || "")) {
+    } else if (extension === "pdf") {
       return <FileText className="h-4 w-4" />
-    } else if (["csv", "xlsx", "xls"].includes(extension || "")) {
+    } else if (["csv", "xlsx", "xls"].includes(extension)) {
       return <FileSpreadsheet className="h-4 w-4" />
     }
+
     return <FileText className="h-4 w-4" />
+  }
+
+  const isImageFile = (fileName: string) => {
+    const extension = fileName.split(".").pop()?.toLowerCase() || ""
+    return ["jpg", "jpeg", "png", "gif", "svg", "webp"].includes(extension)
   }
 
   return (
@@ -181,7 +188,30 @@ export function ViewEntryDialog({ open, onOpenChange, entry }: ViewEntryDialogPr
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {entry.fileUrls.map((url, index) => {
                     const fileName = url.split("/").pop() || `File ${index + 1}`
-                    return (
+
+                    return isImageFile(fileName) ? (
+                      <div key={index} className="border rounded-md overflow-hidden">
+                        <div className="relative h-40 w-full">
+                          <img
+                            src={url || "/placeholder.svg"}
+                            alt={fileName}
+                            className="absolute inset-0 w-full h-full object-contain p-2"
+                          />
+                        </div>
+                        <div className="p-2 border-t flex justify-between items-center">
+                          <span className="text-sm truncate max-w-[70%]">{fileName}</span>
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline flex items-center"
+                          >
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            <span className="text-xs">View</span>
+                          </a>
+                        </div>
+                      </div>
+                    ) : (
                       <div key={index} className="flex items-center p-3 border rounded-md">
                         {getFileIcon(fileName)}
                         <a

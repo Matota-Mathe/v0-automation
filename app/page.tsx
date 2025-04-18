@@ -14,11 +14,13 @@ import { UserFiles } from "@/components/user-files"
 import { LiveSystemLogs } from "@/components/live-system-logs"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Toaster } from "@/components/ui/toaster"
-import { Sliders, Activity, FlaskConical, FileText, Book, Gauge } from "lucide-react"
+import { Sliders, Activity, FlaskConical, FileText, Book, Gauge, Loader2 } from "lucide-react"
 import { LabNotebookSimple } from "@/components/lab-notebook-simple"
 
 export default function Home() {
-  const { user, loading } = useAuth()
+  // Initialize authData outside the try-catch block
+  const authData = useAuth()
+  const { user, loading } = authData
   const router = useRouter()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get("tab")
@@ -137,7 +139,16 @@ export default function Home() {
     }
   }, [user, loading, router])
 
-  if (loading || !user) {
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Loading...</span>
+      </div>
+    )
+  }
+
+  if (!user) {
     return null
   }
 

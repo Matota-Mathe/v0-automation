@@ -24,6 +24,7 @@ import {
   Settings,
   Sliders,
   FileSearch,
+  Loader2,
 } from "lucide-react"
 
 interface DashboardLayoutProps {
@@ -35,7 +36,32 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
-  const { user } = useAuth()
+
+  // Initialize user with a default value
+  const [user, setUser] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    try {
+      const { user: authUser } = useAuth()
+      setUser(authUser)
+    } catch (error) {
+      console.error("Auth context not available:", error)
+      // Handle the error appropriately, e.g., redirect to login
+      // For now, keep user as null
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Loading dashboard...</span>
+      </div>
+    )
+  }
 
   // Close sidebar on mobile by default
   useEffect(() => {
@@ -164,8 +190,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 {user?.name?.charAt(0) || "U"}
               </div>
               <div>
-                <p className="text-sm font-medium">{user?.name}</p>
-                <p className="text-xs text-muted-foreground">{user?.role}</p>
+                <p className="text-sm font-medium">{user?.name || "User"}</p>
+                <p className="text-xs text-muted-foreground">{user?.role || "Guest"}</p>
               </div>
             </div>
             <ThemeToggle />

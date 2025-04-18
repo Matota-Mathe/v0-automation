@@ -23,7 +23,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useLabNotebook } from "@/contexts/lab-notebook-context"
 import { useChemicals } from "@/contexts/chemicals-context"
 import { Badge } from "@/components/ui/badge"
-import { X, Plus, Upload } from "lucide-react"
+import { X, Plus, Upload, Loader2 } from "lucide-react"
+import { getSupabaseBrowserClient } from "@/lib/supabase"
+import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/components/ui/use-toast"
 
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -61,7 +64,7 @@ interface NewEntryDialogProps {
   onOpenChange: (open: boolean) => void
   initialData?: Partial<FormValues>
   isRepeat?: boolean
-  isEdit?: boolean // Add this prop
+  isEdit?: boolean
 }
 
 export function NewEntryDialog({
@@ -73,9 +76,15 @@ export function NewEntryDialog({
 }: NewEntryDialogProps) {
   const { addEntry, updateEntry } = useLabNotebook()
   const { chemicals } = useChemicals()
+  const { user } = useAuth()
+  const { toast } = useToast()
+  const supabase = getSupabaseBrowserClient()
+
   const [files, setFiles] = useState<File[]>([])
+  const [existingFiles, setExistingFiles] = useState<string[]>(initialData?.fileUrls || [])
   const [tags, setTags] = useState<string[]>(initialData?.tags || [])
   const [tagInput, setTagInput] = useState("")
+  const [isUploading, setIsUploading] = useState(false)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -110,6 +119,10 @@ export function NewEntryDialog({
     setFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
+  const removeExistingFile = (url: string) => {
+    setExistingFiles((prev) => prev.filter((fileUrl) => fileUrl !== url))
+  }
+
   const addTag = () => {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
       setTags((prev) => [...prev, tagInput.trim()])
@@ -121,7 +134,69 @@ export function NewEntryDialog({
     setTags((prev) => prev.filter((t) => t !== tag))
   }
 
-  const onSubmit = (values: FormValues) => {
+  // Function to upload files to Supabase storage
+  const uploadFiles = async (files: File[]): Promise<string[]> => {
+    if (!files.length || !user) return []
+
+    setIsUploading(true)
+    const fileUrls: string[] = []
+
+    try {
+      // Create the bucket if it doesn't exist
+      const { data: buckets } = await supabase.storage.listBuckets()
+      if (!buckets?.find((bucket) => bucket.name === "lab-files")) {
+        await supabase.storage.createBucket("lab-files", {
+          public: true,
+          fileSizeLimit: 50 * 1024 * 1024, // 50MB limit
+        })
+      }
+
+      // Upload each file
+      for (const file of files) {
+        const fileExt = file.name.split(".").pop()
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`
+        const filePath = `${user.id}/${fileName}`
+
+        const { data, error } = await supabase.storage.from("lab-files").upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+        })
+
+        if (error) {
+          console.error("Error uploading file:", error)
+          toast({
+            title: "Upload Error",
+            description: `Failed to upload ${file.name}`,
+            variant: "destructive",
+          })
+          continue
+        }
+
+        if (data) {
+          // Get the public URL
+          const { data: publicUrl } = supabase.storage.from("lab-files").getPublicUrl(data.path)
+
+          if (publicUrl) {
+            fileUrls.push(publicUrl.publicUrl)
+          }
+        }
+      }
+
+      return fileUrls
+    } catch (error) {
+      console.error("Error in file upload:", error)
+      toast({
+        title: "Upload Error",
+        description: "An unexpected error occurred during file upload",
+        variant: "destructive",
+      })
+      return []
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const onSubmit = async (values: FormValues) => {
     // Calculate moles and equivalents for each reagent
     const reagentsWithCalculations = values.reagents.map((reagent) => {
       const moles = reagent.concentration * (reagent.volume / 1000)
@@ -140,10 +215,20 @@ export function NewEntryDialog({
       equivalents: (reagent.moles || 0) / lowestMoles,
     }))
 
+    // Upload files if any
+    let uploadedFileUrls: string[] = []
+    if (files.length > 0) {
+      uploadedFileUrls = await uploadFiles(files)
+    }
+
+    // Combine existing files (that weren't removed) with newly uploaded files
+    const allFileUrls = [...existingFiles, ...uploadedFileUrls]
+
     const entryData = {
       ...values,
       reagents: finalReagents,
       tags,
+      fileUrls: allFileUrls,
     }
 
     if (isEdit && initialData?.id) {
@@ -170,6 +255,19 @@ export function NewEntryDialog({
     }
   }
 
+  // Helper function to get file icon/type
+  const getFileType = (fileName: string) => {
+    const extension = fileName.split(".").pop()?.toLowerCase() || ""
+    if (["jpg", "jpeg", "png", "gif", "svg", "webp"].includes(extension)) {
+      return "image"
+    } else if (extension === "pdf") {
+      return "pdf"
+    } else if (["csv", "xlsx", "xls"].includes(extension)) {
+      return "spreadsheet"
+    }
+    return "document"
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -193,7 +291,7 @@ export function NewEntryDialog({
                 <TabsTrigger value="basic">Basic Info</TabsTrigger>
                 <TabsTrigger value="reagents">Reagents</TabsTrigger>
                 <TabsTrigger value="conditions">Conditions</TabsTrigger>
-                <TabsTrigger value="results">Results & Notes</TabsTrigger>
+                <TabsTrigger value="results">Results & Files</TabsTrigger>
               </TabsList>
 
               <TabsContent value="basic" className="space-y-4 pt-4">
@@ -550,6 +648,43 @@ export function NewEntryDialog({
                     <FormItem>
                       <FormLabel>Files</FormLabel>
                       <div className="mt-2 space-y-2">
+                        {/* Existing files */}
+                        {existingFiles.length > 0 && (
+                          <div className="mb-4">
+                            <h4 className="text-sm font-medium mb-2">Existing Files</h4>
+                            <div className="space-y-2">
+                              {existingFiles.map((fileUrl, index) => {
+                                const fileName = fileUrl.split("/").pop() || `File ${index + 1}`
+                                const fileType = getFileType(fileName)
+
+                                return (
+                                  <div key={index} className="flex items-center justify-between p-2 border rounded-md">
+                                    <div className="flex items-center">
+                                      {fileType === "image" && (
+                                        <img
+                                          src={fileUrl || "/placeholder.svg"}
+                                          alt={fileName}
+                                          className="h-8 w-8 object-cover mr-2 rounded"
+                                        />
+                                      )}
+                                      <span className="text-sm">{fileName}</span>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => removeExistingFile(fileUrl)}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* New files to upload */}
                         {files.map((file, index) => (
                           <div key={index} className="flex items-center justify-between p-2 border rounded-md">
                             <div className="flex items-center">
@@ -574,7 +709,7 @@ export function NewEntryDialog({
                               <p className="text-sm text-muted-foreground">
                                 <span className="font-medium">Click to upload</span> or drag and drop
                               </p>
-                              <p className="text-xs text-muted-foreground">PDF, images, or data files</p>
+                              <p className="text-xs text-muted-foreground">PDF, images, or data files (max 50MB)</p>
                             </div>
                             <input
                               id="file-upload"
@@ -597,7 +732,18 @@ export function NewEntryDialog({
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit">{isEdit ? "Update Entry" : "Save Entry"}</Button>
+              <Button type="submit" disabled={isUploading}>
+                {isUploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : isEdit ? (
+                  "Update Entry"
+                ) : (
+                  "Save Entry"
+                )}
+              </Button>
             </DialogFooter>
           </form>
         </Form>
