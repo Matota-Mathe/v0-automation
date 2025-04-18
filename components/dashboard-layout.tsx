@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
@@ -24,7 +24,6 @@ import {
   Settings,
   Sliders,
   FileSearch,
-  Loader2,
 } from "lucide-react"
 
 interface DashboardLayoutProps {
@@ -41,44 +40,30 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [user, setUser] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  const { user: authUser, isLoading: authLoading } = useAuth()
+
+  // Update the user state when authUser changes
   useEffect(() => {
-    try {
-      const { user: authUser } = useAuth()
-      setUser(authUser)
-    } catch (error) {
-      console.error("Auth context not available:", error)
-      // Handle the error appropriately, e.g., redirect to login
-      // For now, keep user as null
-    } finally {
-      setIsLoading(false)
+    setUser(authUser)
+    setIsLoading(false)
+  }, [authUser])
+
+  const handleResize = useCallback(() => {
+    if (window.innerWidth < 1024) {
+      setIsSidebarOpen(false)
+    } else {
+      setIsSidebarOpen(true)
     }
   }, [])
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2">Loading dashboard...</span>
-      </div>
-    )
-  }
-
   // Close sidebar on mobile by default
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 1024) {
-        setIsSidebarOpen(false)
-      } else {
-        setIsSidebarOpen(true)
-      }
-    }
-
     // Set initial state
     handleResize()
 
     window.addEventListener("resize", handleResize)
     return () => window.removeEventListener("resize", handleResize)
-  }, [])
+  }, [handleResize])
 
   // Close mobile menu when route changes
   useEffect(() => {
