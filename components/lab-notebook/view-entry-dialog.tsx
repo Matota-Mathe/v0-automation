@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { LabEntry } from "@/contexts/lab-notebook-context"
-import { FileText, ImageIcon, FileSpreadsheet, ExternalLink } from "lucide-react"
+import { FileText, ImageIcon, FileSpreadsheet, ExternalLink, Download } from "lucide-react"
 
 interface ViewEntryDialogProps {
   open: boolean
@@ -205,22 +205,26 @@ export function ViewEntryDialog({ open, onOpenChange, entry }: ViewEntryDialogPr
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:underline flex items-center"
+                            download={fileName}
                           >
                             <ExternalLink className="h-4 w-4 mr-1" />
-                            <span className="text-xs">View</span>
+                            <span className="text-xs">View/Download</span>
                           </a>
                         </div>
                       </div>
                     ) : (
-                      <div key={index} className="flex items-center p-3 border rounded-md">
+                      <div key={index} className="flex items-center justify-between p-3 border rounded-md">
                         {getFileIcon(fileName)}
+                        <span className="mx-2 text-sm truncate flex-1">{fileName}</span>
                         <a
                           href={url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="ml-2 text-sm text-blue-600 hover:underline truncate"
+                          className="text-blue-600 hover:underline flex items-center"
+                          download={fileName}
                         >
-                          {fileName}
+                          <Download className="h-4 w-4 mr-1" />
+                          <span className="text-xs">Download</span>
                         </a>
                       </div>
                     )

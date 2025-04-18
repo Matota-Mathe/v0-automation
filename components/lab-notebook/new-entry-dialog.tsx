@@ -197,6 +197,9 @@ export function NewEntryDialog({
   }
 
   const onSubmit = async (values: FormValues) => {
+    // Show loading state
+    setIsUploading(true)
+
     // Calculate moles and equivalents for each reagent
     const reagentsWithCalculations = values.reagents.map((reagent) => {
       const moles = reagent.concentration * (reagent.volume / 1000)
@@ -229,15 +232,33 @@ export function NewEntryDialog({
       reagents: finalReagents,
       tags,
       fileUrls: allFileUrls,
+      files: undefined, // Don't store File objects in the database
     }
 
-    if (isEdit && initialData?.id) {
-      updateEntry(initialData.id, entryData)
-    } else {
-      addEntry(entryData)
-    }
+    try {
+      if (isEdit && initialData?.id) {
+        await updateEntry(initialData.id, entryData)
+      } else {
+        await addEntry(entryData)
+      }
 
-    onOpenChange(false)
+      // Show success toast
+      toast({
+        title: isEdit ? "Entry Updated" : "Entry Created",
+        description: `${isEdit ? "Updated" : "Created"} lab notebook entry "${values.title}" successfully.`,
+      })
+
+      onOpenChange(false)
+    } catch (error) {
+      console.error("Error saving entry:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save lab notebook entry. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   const addReagent = () => {
@@ -667,7 +688,7 @@ export function NewEntryDialog({
                                           className="h-8 w-8 object-cover mr-2 rounded"
                                         />
                                       )}
-                                      <span className="text-sm">{fileName}</span>
+                                      <span className="text-sm truncate max-w-[200px]">{fileName}</span>
                                     </div>
                                     <Button
                                       type="button"
@@ -688,7 +709,7 @@ export function NewEntryDialog({
                         {files.map((file, index) => (
                           <div key={index} className="flex items-center justify-between p-2 border rounded-md">
                             <div className="flex items-center">
-                              <span className="text-sm">{file.name}</span>
+                              <span className="text-sm truncate max-w-[200px]">{file.name}</span>
                               <span className="text-xs text-muted-foreground ml-2">
                                 ({(file.size / 1024).toFixed(1)} KB)
                               </span>

@@ -5,49 +5,32 @@ import type React from "react"
 import Link from "next/link"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Beaker, Github, Mail, Key, Info } from "lucide-react"
+import { Beaker, Loader2, Mail, Lock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/contexts/auth-context"
-import { Loader2 } from "lucide-react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 
 export default function HomePage() {
   const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [rememberMe, setRememberMe] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { login } = useAuth()
   const router = useRouter()
 
-  const handleEmailLogin = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
 
     try {
-      // For demo purposes, we'll use the admin@example.com login
-      const success = await login(email, "password123")
+      const success = await login(email, password)
       if (success) {
         router.push("/dashboard")
       } else {
         // In a real app, you'd show an error message
         console.error("Login failed")
-      }
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const handleDemoLogin = async (role: string) => {
-    setIsSubmitting(true)
-    try {
-      let email = "admin@example.com"
-      if (role === "researcher") {
-        email = "researcher@example.com"
-      }
-      const success = await login(email, "password123")
-      if (success) {
-        router.push("/dashboard")
       }
     } catch (err) {
       console.error(err)
@@ -84,33 +67,60 @@ export default function HomePage() {
           <h1 className="text-2xl font-bold text-center mb-1">NMU Flow Chemistry Group</h1>
           <p className="text-center text-muted-foreground mb-6">Sign in to access your lab dashboard</p>
 
-          <Alert className="mb-4">
-            <Info className="h-4 w-4 mr-2" />
-            <AlertDescription>
-              <Link href="/demo-accounts" className="text-primary hover:underline">
-                View all demo accounts
-              </Link>{" "}
-              to test the system with different roles.
-            </AlertDescription>
-          </Alert>
-
-          <form onSubmit={handleEmailLogin} className="space-y-4">
-            <div>
+          <form onSubmit={handleSignIn} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Email
+              </Label>
               <Input
+                id="email"
                 type="email"
-                placeholder="Work Email"
+                placeholder="name@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password" className="flex items-center gap-2">
+                <Lock className="h-4 w-4" />
+                Password
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="remember-me"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                />
+                <Label htmlFor="remember-me" className="text-sm">
+                  Remember me
+                </Label>
+              </div>
+              <Link href="/forgot-password" className="text-sm text-primary hover:underline">
+                Forgot password?
+              </Link>
+            </div>
+
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Please wait
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in...
                 </>
               ) : (
-                "Continue with Email"
+                "Sign In"
               )}
             </Button>
           </form>
@@ -122,21 +132,6 @@ export default function HomePage() {
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
             </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <Button variant="outline" className="w-full" onClick={() => handleDemoLogin("admin")}>
-              <Github className="h-4 w-4 mr-2" />
-              Admin
-            </Button>
-            <Button variant="outline" className="w-full" onClick={() => handleDemoLogin("researcher")}>
-              <Mail className="h-4 w-4 mr-2" />
-              Researcher
-            </Button>
-            <Button variant="outline" className="w-full" disabled>
-              <Key className="h-4 w-4 mr-2" />
-              Guest
-            </Button>
           </div>
 
           <div className="mt-6 space-y-2">

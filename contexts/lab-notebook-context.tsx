@@ -155,19 +155,34 @@ export const LabNotebookProvider: React.FC<{ children: React.ReactNode }> = ({ c
   // Add a new function to handle file uploads to Supabase storage
   // Add this function inside the LabNotebookProvider component before the return statement
 
+  // Update the uploadFiles function to properly handle file uploads to Supabase storage
+
+  // Find the uploadFiles function and replace it with this improved version
   const uploadFiles = async (files: File[]): Promise<string[]> => {
     if (!user || !files.length) return []
 
-    const fileUrls: string[] = []
-
     try {
+      const fileUrls: string[] = []
+
+      // Check if the bucket exists and create it if it doesn't
+      const { data: buckets } = await supabase.storage.listBuckets()
+      if (!buckets?.find((bucket) => bucket.name === "lab-files")) {
+        await supabase.storage.createBucket("lab-files", {
+          public: true,
+          fileSizeLimit: 50 * 1024 * 1024, // 50MB limit
+        })
+      }
+
       // Upload each file to Supabase storage
       for (const file of files) {
         const fileExt = file.name.split(".").pop()
         const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`
         const filePath = `${user.id}/lab-notebook/${fileName}`
 
-        const { data, error } = await supabase.storage.from("lab-files").upload(filePath, file)
+        const { data, error } = await supabase.storage.from("lab-files").upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+        })
 
         if (error) {
           console.error("Error uploading file:", error)
