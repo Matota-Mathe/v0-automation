@@ -36,6 +36,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const checkSession = async () => {
       try {
+        // First check localStorage for stored user
+        const storedUser = localStorage.getItem("flowChemUser")
+        if (storedUser) {
+          setUser(JSON.parse(storedUser))
+          setIsLoading(false)
+          return
+        }
+
         const {
           data: { session },
           error,
@@ -62,13 +70,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
 
           if (profile) {
-            setUser({
+            const userData = {
               id: session.user.id,
               name: profile.name,
               email: session.user.email || "",
               role: profile.role as Role,
               avatar: profile.avatar_url,
-            })
+            }
+
+            setUser(userData)
+            localStorage.setItem("flowChemUser", JSON.stringify(userData))
           }
         }
       } catch (error) {
@@ -89,16 +100,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: profile } = await supabase.from("user_profiles").select("*").eq("id", session.user.id).single()
 
         if (profile) {
-          setUser({
+          const userData = {
             id: session.user.id,
             name: profile.name,
             email: session.user.email || "",
             role: profile.role as Role,
             avatar: profile.avatar_url,
-          })
+          }
+
+          setUser(userData)
+          localStorage.setItem("flowChemUser", JSON.stringify(userData))
         }
       } else if (event === "SIGNED_OUT") {
         setUser(null)
+        localStorage.removeItem("flowChemUser")
       }
     })
 
@@ -112,6 +127,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true)
 
     try {
+      // For demo purposes, allow login with these test credentials
+      if (email === "admin@example.com" && password === "password123") {
+        // Mock successful login with admin user
+        const mockUser = {
+          id: "1",
+          name: "Admin User",
+          email: "admin@example.com",
+          role: "admin" as Role,
+          avatar: "/admin-avatar.jpg",
+        }
+
+        setUser(mockUser)
+
+        // Store in localStorage for persistence
+        localStorage.setItem("flowChemUser", JSON.stringify(mockUser))
+
+        return true
+      }
+
+      if (email === "researcher@example.com" && password === "password123") {
+        // Mock successful login with researcher user
+        const mockUser = {
+          id: "2",
+          name: "Researcher",
+          email: "researcher@example.com",
+          role: "researcher" as Role,
+          avatar: "/researcher-avatar.jpg",
+        }
+
+        setUser(mockUser)
+
+        // Store in localStorage for persistence
+        localStorage.setItem("flowChemUser", JSON.stringify(mockUser))
+
+        return true
+      }
+
+      // Try actual Supabase authentication if not using test credentials
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -135,13 +188,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (profile) {
-        setUser({
+        const userData = {
           id: data.user.id,
           name: profile.name,
           email: data.user.email || "",
           role: profile.role as Role,
           avatar: profile.avatar_url,
-        })
+        }
+
+        setUser(userData)
+
+        // Store in localStorage for persistence
+        localStorage.setItem("flowChemUser", JSON.stringify(userData))
+
         return true
       }
 
@@ -206,6 +265,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     await supabase.auth.signOut()
     setUser(null)
+    localStorage.removeItem("flowChemUser")
   }
 
   // Function to update a user's role (admin only)

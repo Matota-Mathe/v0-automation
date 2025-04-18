@@ -32,7 +32,9 @@ export default function LoginPage() {
       if (success) {
         router.push("/")
       } else {
-        setError("Invalid email or password. Try admin@example.com / password123")
+        setError(
+          "Invalid email or password. Try admin@example.com / password123 or researcher@example.com / password123",
+        )
       }
     } catch (err) {
       setError("An error occurred during login. Please try again.")
