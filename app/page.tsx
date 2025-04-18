@@ -1,285 +1,157 @@
-"use client"
-
-import { useState, useEffect, useRef } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
+import Link from "next/link"
+import { Beaker, ChevronRight, Droplets, List, ThermometerSnowflake } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { PumpControl } from "@/components/pump-control"
-import { ReactorMonitoring } from "@/components/reactor-monitoring"
-import { ReactionConditionsCard } from "@/components/reaction-conditions-card"
-import { MLPredictionCard } from "@/components/ml-prediction-card"
-import { ExperimentRecipes } from "@/components/experiment-recipes"
-import { UserFiles } from "@/components/user-files"
-import { LiveSystemLogs } from "@/components/live-system-logs"
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { Toaster } from "@/components/ui/toaster"
-import { Sliders, Activity, FlaskConical, FileText, Book, Gauge, Loader2 } from "lucide-react"
-import { LabNotebookSimple } from "@/components/lab-notebook-simple"
 
-export default function Home() {
-  // Initialize authData outside the try-catch block
-  const authData = useAuth()
-  const { user, loading } = authData
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const tabParam = searchParams.get("tab")
-  const [activeTab, setActiveTab] = useState(tabParam || "control")
-  const updateInProgress = useRef(false)
-
-  // Update URL when tab changes
-  useEffect(() => {
-    if (activeTab !== "control") {
-      router.push(`/?tab=${activeTab}`, { scroll: false })
-    } else {
-      router.push("/", { scroll: false })
-    }
-  }, [activeTab, router])
-
-  // Initialize system values
-  const [systemValues, setSystemValues] = useState({
-    temperature: { set: 25.0, actual: 25.2 },
-    pressure: { set: 5.0, actual: 5.1 },
-  })
-
-  // Initialize pump flow rates
-  const [pumpFlowRates, setPumpFlowRates] = useState({
-    pump1: { set: 0.5, actual: 0.48 },
-    pump2: { set: 0.3, actual: 0.31 },
-    pump3: { set: 0.0, actual: 0.0 },
-  })
-
-  // Initialize logs
-  const [logs, setLogs] = useState([
-    { timestamp: new Date().toISOString(), message: "System initialized", type: "info" },
-    { timestamp: new Date(Date.now() - 60000).toISOString(), message: "Pumps ready", type: "info" },
-    { timestamp: new Date(Date.now() - 120000).toISOString(), message: "Reactor temperature stable", type: "success" },
-  ])
-
-  // Function to add log entry
-  const addLogEntry = (message, type = "info") => {
-    setLogs((prev) => [
-      { timestamp: new Date().toISOString(), message, type },
-      ...prev.slice(0, 99), // Keep only the last 100 logs
-    ])
-  }
-
-  // Update system value function
-  const updateSystemValue = (parameter, value) => {
-    if (updateInProgress.current) return
-    updateInProgress.current = true
-
-    setSystemValues((prev) => ({
-      ...prev,
-      [parameter]: { ...prev[parameter], set: value },
-    }))
-
-    // Add log entry
-    addLogEntry(`${parameter.charAt(0).toUpperCase() + parameter.slice(1)} set to ${value}`, "info")
-
-    // Simulate actual value changing gradually
-    const timer = setTimeout(() => {
-      setSystemValues((prev) => {
-        const newValue = {
-          ...prev,
-          [parameter]: {
-            ...prev[parameter],
-            actual: value + (Math.random() * 0.4 - 0.2), // Add small random variation
-          },
-        }
-        updateInProgress.current = false
-        return newValue
-      })
-    }, 500)
-
-    return () => {
-      clearTimeout(timer)
-      updateInProgress.current = false
-    }
-  }
-
-  // Update pump flow rate function with debounce
-  const updatePumpFlowRate = (pumpId, value) => {
-    if (updateInProgress.current) return
-    updateInProgress.current = true
-
-    setPumpFlowRates((prev) => ({
-      ...prev,
-      [pumpId]: { ...prev[pumpId], set: value },
-    }))
-
-    // Add log entry
-    addLogEntry(`${pumpId.charAt(0).toUpperCase() + pumpId.slice(1)} flow rate set to ${value} mL/min`, "info")
-
-    // Simulate actual value changing gradually
-    const timer = setTimeout(() => {
-      setPumpFlowRates((prev) => {
-        const actualValue = value > 0 ? value + (Math.random() * 0.1 - 0.05) : 0
-        const newRates = {
-          ...prev,
-          [pumpId]: {
-            ...prev[pumpId],
-            actual: actualValue,
-          },
-        }
-        updateInProgress.current = false
-        return newRates
-      })
-    }, 500)
-
-    return () => {
-      clearTimeout(timer)
-      updateInProgress.current = false
-    }
-  }
-
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push("/login")
-    }
-  }, [user, loading, router])
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2">Loading...</span>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return null
-  }
-
+export default function HomePage() {
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Gauge className="h-5 w-5 text-primary" />
-                Current Experiment
-              </CardTitle>
-              <CardDescription>Configure and monitor your active experiment</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ReactionConditionsCard />
-            </CardContent>
-          </Card>
-          <Card className="shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Activity className="h-5 w-5 text-primary" />
-                Predictions
-              </CardTitle>
-              <CardDescription>AI-powered reaction optimization</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <MLPredictionCard />
-            </CardContent>
-          </Card>
+    <div className="flex min-h-screen flex-col">
+      {/* Navbar */}
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-16 items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Beaker className="h-6 w-6 text-emerald-600" />
+            <span className="text-xl font-semibold tracking-tight">Automated Flow Chemistry Lab</span>
+          </div>
+          <nav className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" className="rounded-full" aria-label="User profile">
+              <div className="relative flex h-8 w-8 shrink-0 overflow-hidden rounded-full">
+                <div className="flex h-full w-full items-center justify-center rounded-full bg-muted text-muted-foreground">
+                  <span className="text-sm font-medium">JD</span>
+                </div>
+              </div>
+            </Button>
+          </nav>
         </div>
+      </header>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full justify-start overflow-x-auto">
-            <TabsTrigger value="control" className="flex items-center gap-2">
-              <Sliders className="h-4 w-4" />
-              <span>Control</span>
-            </TabsTrigger>
-            <TabsTrigger value="monitoring" className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              <span>Monitoring</span>
-            </TabsTrigger>
-            <TabsTrigger value="recipes" className="flex items-center gap-2">
-              <FlaskConical className="h-4 w-4" />
-              <span>Recipes</span>
-            </TabsTrigger>
-            <TabsTrigger value="notebook" className="flex items-center gap-2">
-              <Book className="h-4 w-4" />
-              <span>Notebook</span>
-            </TabsTrigger>
-            <TabsTrigger value="files" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              <span>Files</span>
-            </TabsTrigger>
-          </TabsList>
+      <main className="flex-1">
+        {/* Hero Section */}
+        <section className="w-full py-12 md:py-24 lg:py-32 bg-gradient-to-b from-white to-gray-50">
+          <div className="container px-4 md:px-6">
+            <div className="flex flex-col items-center justify-center space-y-4 text-center">
+              <div className="space-y-2">
+                <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl/none">
+                  Welcome to Your Smart Flow Chemistry Control Hub
+                </h1>
+                <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl">
+                  Monitor, control, and optimize your flow chemistry experiments with precision and ease. Streamline
+                  your lab workflow with our integrated automation platform.
+                </p>
+              </div>
+              <div className="space-x-4">
+                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" size="lg">
+                  Start Experiment
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="lg">
+                  View Documentation
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
 
-          <TabsContent value="control" className="mt-6 space-y-4">
-            <Card className="shadow-sm hover:shadow-md transition-shadow">
-              <CardHeader>
-                <CardTitle>Pump Control</CardTitle>
-                <CardDescription>Configure and control flow rates for all pumps</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <PumpControl pumpFlowRates={pumpFlowRates} updatePumpFlowRate={updatePumpFlowRate} />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="monitoring" className="mt-6 space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader>
-                  <CardTitle>Reactor Monitoring</CardTitle>
-                  <CardDescription>Monitor and control reactor conditions</CardDescription>
+        {/* Feature Cards */}
+        <section className="w-full py-12 md:py-24 lg:py-32 bg-white">
+          <div className="container px-4 md:px-6">
+            <div className="mx-auto grid max-w-5xl items-center gap-6 py-12 lg:grid-cols-3 lg:gap-12">
+              <Card className="border-2 border-emerald-100 shadow-sm hover:shadow-md transition-shadow">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-full bg-emerald-100 p-2">
+                      <Droplets className="h-6 w-6 text-emerald-600" />
+                    </div>
+                    <CardTitle className="text-xl">Pump Control</CardTitle>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <ReactorMonitoring systemValues={systemValues} updateSystemValue={updateSystemValue} />
+                  <CardDescription className="text-base">
+                    Precisely control flow rates, manage multiple pumps, and create automated sequences for your
+                    experiments.
+                  </CardDescription>
                 </CardContent>
               </Card>
-
-              <Card className="shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader>
-                  <CardTitle>System Status</CardTitle>
-                  <CardDescription>Live system logs and status</CardDescription>
+              <Card className="border-2 border-emerald-100 shadow-sm hover:shadow-md transition-shadow">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-full bg-emerald-100 p-2">
+                      <ThermometerSnowflake className="h-6 w-6 text-emerald-600" />
+                    </div>
+                    <CardTitle className="text-xl">Temperature & Pressure Monitoring</CardTitle>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <LiveSystemLogs logs={logs} />
+                  <CardDescription className="text-base">
+                    Real-time monitoring of critical parameters with customizable alerts and automatic safety protocols.
+                  </CardDescription>
+                </CardContent>
+              </Card>
+              <Card className="border-2 border-emerald-100 shadow-sm hover:shadow-md transition-shadow">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-full bg-emerald-100 p-2">
+                      <List className="h-6 w-6 text-emerald-600" />
+                    </div>
+                    <CardTitle className="text-xl">Experiment Recipe Logs</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <CardDescription className="text-base">
+                    Save, load, and share experiment protocols. Comprehensive logging ensures reproducibility and
+                    traceability.
+                  </CardDescription>
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
+          </div>
+        </section>
 
-          <TabsContent value="recipes" className="mt-6 space-y-4">
-            <Card className="shadow-sm hover:shadow-md transition-shadow">
-              <CardHeader>
-                <CardTitle>Experiment Recipes</CardTitle>
-                <CardDescription>Create and manage experiment recipes</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ExperimentRecipes addLogEntry={addLogEntry} />
-              </CardContent>
-            </Card>
-          </TabsContent>
+        {/* Dashboard Preview */}
+        <section className="w-full py-12 md:py-24 lg:py-32 bg-gray-50">
+          <div className="container px-4 md:px-6">
+            <div className="flex flex-col items-center justify-center space-y-4 text-center">
+              <div className="space-y-2">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
+                  Powerful Analytics at Your Fingertips
+                </h2>
+                <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl">
+                  Visualize experiment data in real-time and gain insights to optimize your chemistry workflows.
+                </p>
+              </div>
+              <div className="mx-auto w-full max-w-4xl overflow-hidden rounded-xl border bg-white shadow-lg">
+                <div className="p-4">
+                  <div className="h-[300px] w-full rounded-lg bg-gray-100 flex items-center justify-center">
+                    <div className="text-emerald-600/30 text-6xl font-bold">Dashboard Preview</div>
+                  </div>
+                </div>
+              </div>
+              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white mt-8" size="lg">
+                Explore Dashboard Features
+              </Button>
+            </div>
+          </div>
+        </section>
+      </main>
 
-          <TabsContent value="notebook" className="mt-6 space-y-4">
-            <Card className="shadow-sm hover:shadow-md transition-shadow">
-              <CardHeader>
-                <CardTitle>Lab Notebook</CardTitle>
-                <CardDescription>Record and track your experiments</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <LabNotebookSimple />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="files" className="mt-6 space-y-4">
-            <Card className="shadow-sm hover:shadow-md transition-shadow">
-              <CardHeader>
-                <CardTitle>File Management</CardTitle>
-                <CardDescription>Upload and manage experiment files</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <UserFiles addLogEntry={addLogEntry} />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
-      <Toaster />
-    </DashboardLayout>
+      {/* Footer */}
+      <footer className="w-full border-t py-6 md:py-0">
+        <div className="container flex flex-col items-center justify-between gap-4 md:h-16 md:flex-row">
+          <p className="text-sm text-muted-foreground">
+            &copy; {new Date().getFullYear()} Automated Flow Chemistry Lab. All rights reserved.
+          </p>
+          <div className="flex items-center gap-4">
+            <Link
+              href="https://github.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+            >
+              GitHub Repository
+            </Link>
+          </div>
+        </div>
+      </footer>
+    </div>
   )
 }
